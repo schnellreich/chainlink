@@ -135,3 +135,5 @@ export const bulkDeleteJobRuns = (status, updatedBefore) => destroy(
     updatedBefore: updatedBefore
   }
 )
+
+export const getTransactions = () => get(`/v2/txattempts`)
