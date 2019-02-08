@@ -19,12 +19,13 @@ const (
 	RequestLogTopicSignature = iota
 	RequestLogTopicJobID
 	RequestLogTopicRequester
-	RequestLogTopicAmount
+	RequestLogTopicPayment
 )
 
 const (
 	evmWordSize      = common.HashLength
 	idSize           = evmWordSize
+	paymentSize      = evmWordSize
 	versionSize      = evmWordSize
 	callbackAddrSize = evmWordSize
 	callbackFuncSize = evmWordSize
@@ -253,10 +254,22 @@ func (le RunLogEvent) Validate() bool {
 
 // ContractPayment returns the amount attached to a contract to pay the Oracle upon fulfillment.
 func (le RunLogEvent) ContractPayment() (*assets.Link, error) {
-	encodedAmount := le.Log.Topics[RequestLogTopicAmount].Hex()
-	payment, ok := new(assets.Link).SetString(encodedAmount, 0)
+	version, err := le.Log.getTopic(0)
+	if err != nil {
+		return nil, err
+	}
+
+	var encodedAmount common.Hash
+	if version == RunLogTopic0 || version == RunLogTopic20190123 {
+		encodedAmount = le.Log.Topics[RequestLogTopicPayment]
+	} else {
+		paymentStart := idSize
+		encodedAmount = common.BytesToHash(le.Log.Data[paymentStart : paymentStart+paymentSize])
+	}
+
+	payment, ok := new(assets.Link).SetString(encodedAmount.Hex(), 0)
 	if !ok {
-		return payment, fmt.Errorf("unable to decoded amount from RunLog: %s", encodedAmount)
+		return payment, fmt.Errorf("unable to decoded amount from RunLog: %s", encodedAmount.Hex())
 	}
 	return payment, nil
 }
@@ -337,7 +350,7 @@ func parseRunLog20190123(log Log) (JSON, error) {
 	callbackAndExpStart := idSize + versionSize
 	callbackAndExpEnd := callbackAndExpStart + callbackAddrSize + callbackFuncSize + expirationSize
 	dataPrefix := bytesToHex(append(append(data[:idSize],
-		log.Topics[RequestLogTopicAmount].Bytes()...),
+		log.Topics[RequestLogTopicPayment].Bytes()...),
 		data[callbackAndExpStart:callbackAndExpEnd]...))
 	js, err = js.Add("dataPrefix", dataPrefix)
 	if err != nil {
@@ -349,7 +362,9 @@ func parseRunLog20190123(log Log) (JSON, error) {
 
 func parseRunLog20190128(log Log) (JSON, error) {
 	data := log.Data
-	cborStart := idSize + callbackAddrSize + callbackFuncSize + expirationSize + versionSize + dataLocationSize + dataLengthSize
+	idStart := 0
+	expirationEnd := idSize + paymentSize + callbackAddrSize + callbackFuncSize + expirationSize
+	cborStart := expirationEnd + versionSize + dataLocationSize + dataLengthSize
 	js, err := ParseCBOR(data[cborStart:])
 	if err != nil {
 		return js, err
@@ -360,16 +375,11 @@ func parseRunLog20190128(log Log) (JSON, error) {
 		return js, err
 	}
 
-	callbackAndExpStart := idSize
-	callbackAndExpEnd := callbackAndExpStart + callbackFuncSize + expirationSize + callbackAddrSize
-	dataPrefix := []byte{}
-	dataPrefix = append(dataPrefix, data[:idSize]...)
-	dataPrefix = append(dataPrefix, log.Topics[RequestLogTopicAmount].Bytes()...)
-	dataPrefix = append(dataPrefix, data[callbackAndExpStart:callbackAndExpEnd]...)
-	js, err = js.Add("dataPrefix", bytesToHex(dataPrefix))
+	js, err = js.Add("dataPrefix", bytesToHex(data[idStart:expirationEnd]))
 	if err != nil {
 		return js, err
 	}
+
 	return js.Add("functionSelector", OracleFulfillmentFunctionID20190128)
 }
 
