@@ -47,8 +47,8 @@ func TestParseRunLog(t *testing.T) {
 				"functionSelector":"0xeea57e70"}`),
 		},
 		{
-			name:        "20190128 on-chain commitment",
-			log:         cltest.LogFromFixture(t, "../../internal/fixtures/eth/request_log20190128.json"),
+			name:        "20190207 on-chain commitment",
+			log:         cltest.LogFromFixture(t, "../../internal/fixtures/eth/request_log20190207.json"),
 			wantErrored: false,
 			wantData: cltest.JSONFromString(t, `{
 				"url":"https://min-api.cryptocompare.com/data/price?fsym=eth&tsyms=usd,eur,jpy",
@@ -281,7 +281,7 @@ func TestFilterQueryFactory_InitiatorRunLog(t *testing.T) {
 		FromBlock: fromBlock.Add(fromBlock, big.NewInt(1)),
 		Topics: [][]common.Hash{
 			{
-				models.RunLogTopic20190128,
+				models.RunLogTopic20190207,
 				models.RunLogTopic20190123,
 				models.RunLogTopic0,
 			}, {
@@ -316,7 +316,7 @@ func TestContractPayment(t *testing.T) {
 		},
 		{
 			name:        "20190207 on-chain commitment",
-			log:         cltest.LogFromFixture(t, "../../internal/fixtures/eth/request_log20190128.json"),
+			log:         cltest.LogFromFixture(t, "../../internal/fixtures/eth/request_log20190207.json"),
 			wantErrored: false,
 			want:        assets.NewLink(1000000000000000001),
 		},
